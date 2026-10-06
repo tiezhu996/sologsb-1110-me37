@@ -1,5 +1,6 @@
 import { computed, type ComputedRef } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { matchesAlias } from '../utils/aliases';
 import type { WoodBoard, WoodSpecies } from '../types/wood-board';
 
 export type StageKey = 'select' | 'carve' | 'lacquer' | 'string';
@@ -63,8 +64,10 @@ export function useGuqinFilter(): GuqinFilterApi {
       if (guqinNo.value && board.guqinNo !== guqinNo.value) return false;
       if (species.value && board.species !== (species.value as WoodSpecies)) return false;
       if (kw) {
-        const haystack = `${board.boardNo} ${board.guqinNo} ${board.species} ${board.remark ?? ''}`.toLowerCase();
-        if (!haystack.includes(kw)) return false;
+        // 旧号只作可搜索别名：用旧号关键字也能搜到已合档到正式号的板材
+        const aliasHit = matchesAlias(board.guqinNo, kw);
+        const haystack = `${board.boardNo} ${board.species} ${board.remark ?? ''}`.toLowerCase();
+        if (!aliasHit && !haystack.includes(kw)) return false;
       }
       return true;
     });

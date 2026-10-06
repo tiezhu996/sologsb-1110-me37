@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { db } from '../utils/db';
 import { uid } from '../utils/id';
 import { toPlain } from '../utils/plain';
+import { matchesAlias } from '../utils/aliases';
 import type { StringDefect, StringType, Stringing, ToneVersion } from '../types/stringing';
 
 export interface StringingInput {
@@ -33,17 +34,19 @@ export const useStringingStore = defineStore('stringing', {
     byGuqin(state) {
       return (guqinNo: string): Stringing | undefined => state.stringings.find((s) => s.guqinNo === guqinNo);
     },
-    /** 三段评语 + 九德的文字检索 */
+    /** 三段评语 + 九德的文字检索（旧号作为别名同样可搜到正式琴号） */
     search(state) {
       return (keyword: string): Stringing[] => {
         const kw = keyword.trim().toLowerCase();
         if (!kw) return state.stringings;
-        return state.stringings.filter((s) =>
-          [s.guqinNo, s.sanNote, s.anNote, s.fanNote, s.nineVirtues, s.operator, s.defects.join(' ')]
+        return state.stringings.filter((s) => {
+          // 关键字命中正式琴号或任一旧号别名即视为命中号码
+          if (matchesAlias(s.guqinNo, kw)) return true;
+          return [s.sanNote, s.anNote, s.fanNote, s.nineVirtues, s.operator, s.defects.join(' ')]
             .join(' ')
             .toLowerCase()
-            .includes(kw),
-        );
+            .includes(kw);
+        });
       };
     },
     defectCount(state): number {

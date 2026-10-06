@@ -7,6 +7,7 @@ import DimensionChart from '../components/common/DimensionChart.vue';
 import { useBoardStore } from '../stores/boardStore';
 import { useChamberStore } from '../stores/chamberStore';
 import { useGuqinFilter } from '../hooks/useGuqinFilter';
+import { aliasLabel } from '../utils/aliases';
 import { thicknessGap } from '../utils/wood';
 import { formatDate } from '../utils/layer';
 import {
@@ -170,6 +171,12 @@ async function remove(board: WoodBoard) {
         <template #header>面板 / 底板配对（含水率回显）</template>
         <el-table :data="visiblePairs" size="small" border>
           <el-table-column prop="guqinNo" label="琴号" width="110" />
+          <el-table-column label="旧号别名" min-width="140">
+            <template #default="scope">
+              <span v-if="aliasLabel(scope.row.guqinNo)" class="alias-text">{{ aliasLabel(scope.row.guqinNo) }}</span>
+              <span v-else class="muted">—</span>
+            </template>
+          </el-table-column>
           <el-table-column label="面板" min-width="200">
             <template #default="scope">
               <span v-if="scope.row.panel">{{ scope.row.panel.boardNo }} · {{ scope.row.panel.species }} · {{ scope.row.panel.thicknessMm }}mm</span>
@@ -310,5 +317,12 @@ async function remove(board: WoodBoard) {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+.alias-text {
+  color: #8a7a68;
+  font-size: 12px;
+}
+.muted {
+  color: #b3a696;
 }
 </style>

@@ -1,4 +1,8 @@
 import { db, SCHEMA_VERSION } from './db';
+import { getMeta } from './db';
+import { getAliasesCached, loadAliases, putAliases, type GuqinAliasMap } from './aliases';
+
+const ALIASES_META_KEY = 'guqinAliases';
 
 export interface BackupPayload {
   app: string;
@@ -8,16 +12,20 @@ export interface BackupPayload {
   chambers: unknown[];
   lacquers: unknown[];
   stringings: unknown[];
+  /** 旧号别名表（正式琴号 -> 旧号列表） */
+  aliases?: GuqinAliasMap;
 }
 
 /** 汇总全部本地表为 JSON 备份（schema 迁移前先导出） */
 export async function buildBackup(): Promise<BackupPayload> {
-  const [boards, chambers, lacquers, stringings] = await Promise.all([
+  const [boards, chambers, lacquers, stringings, aliasRow] = await Promise.all([
     db.boards.toArray(),
     db.chambers.toArray(),
     db.lacquers.toArray(),
     db.stringings.toArray(),
+    getMeta(ALIASES_META_KEY),
   ]);
+  const aliases = aliasRow ? (JSON.parse(aliasRow) as GuqinAliasMap) : getAliasesCached();
   return {
     app: 'gbguqin',
     schemaVersion: SCHEMA_VERSION,
@@ -26,6 +34,7 @@ export async function buildBackup(): Promise<BackupPayload> {
     chambers,
     lacquers,
     stringings,
+    aliases,
   };
 }
 
@@ -70,12 +79,18 @@ export async function importBackup(text: string): Promise<{ boards: number; cham
     lacquers: payload.lacquers?.length ?? 0,
     stringings: payload.stringings?.length ?? 0,
   };
-  await db.transaction('rw', db.boards, db.chambers, db.lacquers, db.stringings, async () => {
+  await db.transaction('rw', db.boards, db.chambers, db.lacquers, db.stringings, db.meta, async () => {
     await Promise.all([db.boards.clear(), db.chambers.clear(), db.lacquers.clear(), db.stringings.clear()]);
     if (payload.boards?.length) await db.boards.bulkPut(payload.boards as never[]);
     if (payload.chambers?.length) await db.chambers.bulkPut(payload.chambers as never[]);
     if (payload.lacquers?.length) await db.lacquers.bulkPut(payload.lacquers as never[]);
     if (payload.stringings?.length) await db.stringings.bulkPut(payload.stringings as never[]);
+    // 旧号别名随备份一起恢复，导入后旧号仍可搜索
+    await db.meta.where('key').equals(ALIASES_META_KEY).delete();
+    if (payload.aliases && Object.keys(payload.aliases).length) {
+      await db.meta.put({ key: ALIASES_META_KEY, value: JSON.stringify(payload.aliases) });
+    }
   });
+  await (payload.aliases ? putAliases(payload.aliases) : loadAliases());
   return counts;
 }

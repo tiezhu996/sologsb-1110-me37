@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus';
 import { Download } from '@element-plus/icons-vue';
 import { seedIfEmpty } from './utils/seed';
 import { downloadText, exportBackupJson } from './utils/export';
+import { loadAliases } from './utils/aliases';
 import { useBoardStore } from './stores/boardStore';
 import { useChamberStore } from './stores/chamberStore';
 import { useLacquerStore } from './stores/lacquerStore';
@@ -20,6 +21,7 @@ const ready = ref(false);
 onMounted(async () => {
   try {
     await seedIfEmpty();
+    await loadAliases();
     await Promise.all([boardStore.hydrate(), chamberStore.hydrate(), lacquerStore.hydrate(), stringingStore.hydrate()]);
   } catch (error) {
     ElMessage.error(`本地数据装载失败：${(error as Error).message}`);
@@ -45,6 +47,7 @@ async function handleExport() {
       <el-menu :default-active="route.path" router class="app-menu" background-color="#4a3728" text-color="#f0e6d8" active-text-color="#ffd591">
         <el-menu-item index="/">琴坯进度</el-menu-item>
         <el-menu-item index="/boards">板材登记</el-menu-item>
+        <el-menu-item index="/merge">琴号合档</el-menu-item>
         <el-menu-item index="/chambers">槽腹尺寸</el-menu-item>
         <el-menu-item index="/lacquer">灰胎髹漆</el-menu-item>
         <el-menu-item index="/stringing">上弦评价</el-menu-item>
