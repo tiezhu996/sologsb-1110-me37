@@ -3,6 +3,7 @@ import { useBoardStore } from '../stores/boardStore';
 import { useChamberStore } from '../stores/chamberStore';
 import { useLacquerStore } from '../stores/lacquerStore';
 import { useStringingStore } from '../stores/stringingStore';
+import { useAliasStore } from '../stores/aliasStore';
 import { cumulativeThickness } from '../utils/layer';
 
 export type StageKey = 'select' | 'carve' | 'lacquer' | 'string';
@@ -16,6 +17,8 @@ export interface StageItem {
 
 export interface StageProgress {
   guqinNo: string;
+  /** 旧号（临时琴号）别名，仅供检索与展示 */
+  aliases: string[];
   species: string;
   stages: StageItem[];
   /** 阶段推进比（0~100） */
@@ -44,25 +47,31 @@ export function useStageProgress() {
   const chamberStore = useChamberStore();
   const lacquerStore = useLacquerStore();
   const stringingStore = useStringingStore();
+  const aliasStore = useAliasStore();
 
+  /** 所有工序数据一律按正式琴号汇总（旧号经别名索引解析） */
   const guqinNos = computed(() => {
+    const index = aliasStore.aliasIndex;
+    const canonical = (no: string) => index.get(no) ?? no;
     const set = new Set<string>();
-    boardStore.boards.forEach((b) => set.add(b.guqinNo));
-    chamberStore.chambers.forEach((c) => set.add(c.guqinNo));
-    lacquerStore.layers.forEach((l) => set.add(l.guqinNo));
-    stringingStore.stringings.forEach((s) => set.add(s.guqinNo));
+    boardStore.boards.forEach((b) => set.add(canonical(b.guqinNo)));
+    chamberStore.chambers.forEach((c) => set.add(canonical(c.guqinNo)));
+    lacquerStore.layers.forEach((l) => set.add(canonical(l.guqinNo)));
+    stringingStore.stringings.forEach((s) => set.add(canonical(s.guqinNo)));
     return Array.from(set).sort();
   });
 
-  const progressList = computed<StageProgress[]>(() =>
-    guqinNos.value.map((guqinNo) => {
-      const boards = boardStore.boards.filter((b) => b.guqinNo === guqinNo);
+  const progressList = computed<StageProgress[]>(() => {
+    const index = aliasStore.aliasIndex;
+    const canonical = (no: string) => index.get(no) ?? no;
+    return guqinNos.value.map((guqinNo) => {
+      const boards = boardStore.boards.filter((b) => canonical(b.guqinNo) === guqinNo);
       const panel = boards.find((b) => b.part === '面板');
       const base = boards.find((b) => b.part === '底板');
-      const chamber = chamberStore.chambers.find((c) => c.guqinNo === guqinNo);
-      const layers = lacquerStore.layers.filter((l) => l.guqinNo === guqinNo);
+      const chamber = chamberStore.chambers.find((c) => canonical(c.guqinNo) === guqinNo);
+      const layers = lacquerStore.layers.filter((l) => canonical(l.guqinNo) === guqinNo);
       const total = cumulativeThickness(layers);
-      const stringing = stringingStore.stringings.find((s) => s.guqinNo === guqinNo);
+      const stringing = stringingStore.stringings.find((s) => canonical(s.guqinNo) === guqinNo);
       const species = panel?.species ?? base?.species ?? '';
 
       const stages: StageItem[] = [
@@ -95,14 +104,15 @@ export function useStageProgress() {
       const doneCount = stages.filter((s) => s.done).length;
       return {
         guqinNo,
+        aliases: aliasStore.aliasesOf(guqinNo),
         species,
         stages,
         ratio: Math.round((doneCount / stages.length) * 100),
         missing: stages.filter((s) => !s.done).map((s) => s.label),
         cumulativeMm: Number(total.toFixed(2)),
       };
-    }),
-  );
+    });
+  });
 
   const summary = computed(() => {
     const base: Record<StageKey, number> = { select: 0, carve: 0, lacquer: 0, string: 0 };

@@ -9,17 +9,21 @@ import { useBoardStore } from './stores/boardStore';
 import { useChamberStore } from './stores/chamberStore';
 import { useLacquerStore } from './stores/lacquerStore';
 import { useStringingStore } from './stores/stringingStore';
+import { useAliasStore } from './stores/aliasStore';
 
 const route = useRoute();
 const boardStore = useBoardStore();
 const chamberStore = useChamberStore();
 const lacquerStore = useLacquerStore();
 const stringingStore = useStringingStore();
+const aliasStore = useAliasStore();
 const ready = ref(false);
 
 onMounted(async () => {
   try {
     await seedIfEmpty();
+    // 别名表先装载：四类数据的琴号读取都要先经「旧号 → 正式琴号」解析
+    await aliasStore.hydrate();
     await Promise.all([boardStore.hydrate(), chamberStore.hydrate(), lacquerStore.hydrate(), stringingStore.hydrate()]);
   } catch (error) {
     ElMessage.error(`本地数据装载失败：${(error as Error).message}`);
@@ -48,6 +52,7 @@ async function handleExport() {
         <el-menu-item index="/chambers">槽腹尺寸</el-menu-item>
         <el-menu-item index="/lacquer">灰胎髹漆</el-menu-item>
         <el-menu-item index="/stringing">上弦评价</el-menu-item>
+        <el-menu-item index="/merge">琴号合档</el-menu-item>
       </el-menu>
     </el-aside>
     <el-container>

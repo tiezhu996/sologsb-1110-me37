@@ -3,18 +3,20 @@ import type { WoodBoard } from '../types/wood-board';
 import type { SoundChamber } from '../types/sound-chamber';
 import type { LacquerLayer } from '../types/lacquer-layer';
 import type { Stringing } from '../types/stringing';
+import type { GuqinAlias } from '../types/guqin-alias';
 
 /** IndexedDB 库名（浏览器本地存储，无后端） */
 export const DB_NAME = 'gbguqin-db';
 
 /** 当前 schema 版本，与 db.version(n) 对应 */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 class GuqinDB extends Dexie {
   boards!: Table<WoodBoard, string>;
   chambers!: Table<SoundChamber, string>;
   lacquers!: Table<LacquerLayer, string>;
   stringings!: Table<Stringing, string>;
+  aliases!: Table<GuqinAlias, string>;
   meta!: Table<{ key: string; value: string }, string>;
 
   constructor() {
@@ -49,6 +51,18 @@ class GuqinDB extends Dexie {
             }
           });
       });
+
+    // v3：琴号合档——新增 aliases 表，正式琴号下挂旧号（临时琴号）别名；
+    // 四类工序数据（板材/槽腹/髹漆/上弦）一律只挂正式琴号，旧号仅供搜索。
+    // 合档核对清单（含恢复快照）存 meta，不另建表。
+    this.version(3).stores({
+      boards: 'id, boardNo, guqinNo, part, species, grain, receivedAt',
+      chambers: 'id, guqinNo, postPos, carvedAt',
+      lacquers: 'id, guqinNo, seq, [guqinNo+seq], appliedAt',
+      stringings: 'id, guqinNo, stringType, strungAt',
+      aliases: 'id, guqinNo, *aliases',
+      meta: 'key',
+    });
   }
 }
 

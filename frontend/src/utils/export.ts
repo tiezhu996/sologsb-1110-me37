@@ -8,15 +8,17 @@ export interface BackupPayload {
   chambers: unknown[];
   lacquers: unknown[];
   stringings: unknown[];
+  aliases?: unknown[];
 }
 
 /** 汇总全部本地表为 JSON 备份（schema 迁移前先导出） */
 export async function buildBackup(): Promise<BackupPayload> {
-  const [boards, chambers, lacquers, stringings] = await Promise.all([
+  const [boards, chambers, lacquers, stringings, aliases] = await Promise.all([
     db.boards.toArray(),
     db.chambers.toArray(),
     db.lacquers.toArray(),
     db.stringings.toArray(),
+    db.aliases.toArray(),
   ]);
   return {
     app: 'gbguqin',
@@ -26,6 +28,7 @@ export async function buildBackup(): Promise<BackupPayload> {
     chambers,
     lacquers,
     stringings,
+    aliases,
   };
 }
 
@@ -70,12 +73,25 @@ export async function importBackup(text: string): Promise<{ boards: number; cham
     lacquers: payload.lacquers?.length ?? 0,
     stringings: payload.stringings?.length ?? 0,
   };
-  await db.transaction('rw', db.boards, db.chambers, db.lacquers, db.stringings, async () => {
-    await Promise.all([db.boards.clear(), db.chambers.clear(), db.lacquers.clear(), db.stringings.clear()]);
+  await db.transaction(
+    'rw',
+    [db.boards, db.chambers, db.lacquers, db.stringings, db.aliases, db.meta],
+    async () => {
+    await Promise.all([
+      db.boards.clear(),
+      db.chambers.clear(),
+      db.lacquers.clear(),
+      db.stringings.clear(),
+      db.aliases.clear(),
+    ]);
     if (payload.boards?.length) await db.boards.bulkPut(payload.boards as never[]);
     if (payload.chambers?.length) await db.chambers.bulkPut(payload.chambers as never[]);
     if (payload.lacquers?.length) await db.lacquers.bulkPut(payload.lacquers as never[]);
     if (payload.stringings?.length) await db.stringings.bulkPut(payload.stringings as never[]);
+    // 旧版备份（v2 之前）没有 aliases 表：四类数据仍按各自琴号存在，不影响读取
+    if (payload.aliases?.length) await db.aliases.bulkPut(payload.aliases as never[]);
+    // 恢复的是外部快照，库内可能悬挂的「合档进行中清单」必须作废，避免对新数据误迁移
+    await db.meta.delete('merge:active-checklist');
   });
   return counts;
 }

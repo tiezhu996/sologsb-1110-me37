@@ -22,6 +22,7 @@ const { progressList, summary } = useStageProgress();
 
 const stageParam = computed(() => (typeof route.query.stage === 'string' ? route.query.stage : ''));
 const speciesParam = computed(() => (typeof route.query.species === 'string' ? route.query.species : ''));
+const keywordParam = computed(() => (typeof route.query.kw === 'string' ? route.query.kw.trim().toLowerCase() : ''));
 
 const visible = computed(() =>
   progressList.value.filter((item) => {
@@ -29,6 +30,10 @@ const visible = computed(() =>
     if (stageParam.value) {
       const stage = item.stages.find((s) => s.label === stageParam.value);
       if (!stage || !stage.done) return false;
+    }
+    // 琴号与旧号别名都可搜索
+    if (keywordParam.value && !`${item.guqinNo} ${item.aliases.join(' ')}`.toLowerCase().includes(keywordParam.value)) {
+      return false;
     }
     return true;
   }),
@@ -123,12 +128,20 @@ const events = computed<TimelineEvent[]>(() => {
           { key: 'stage', label: '工序阶段', options: ['选材', '掏膛', '灰胎', '上弦'], width: 120 },
           { key: 'species', label: '树种', options: WOOD_SPECIES, width: 110 },
         ]"
-        keyword-placeholder="搜索琴号（本页按阶段/树种筛选）"
+        keyword-placeholder="搜索正式琴号或旧号别名"
         :result-count="visible.length"
         :total-count="progressList.length"
       />
       <el-table :data="visible" size="small" border>
-        <el-table-column prop="guqinNo" label="琴号" width="110" />
+        <el-table-column prop="guqinNo" label="正式琴号" width="110" />
+        <el-table-column label="旧号别名" width="140">
+          <template #default="scope">
+            <el-tag v-for="alias in scope.row.aliases" :key="alias" size="small" type="info" effect="plain" class="alias-tag">
+              {{ alias }}
+            </el-tag>
+            <span v-if="!scope.row.aliases.length" class="alias-empty">—</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="species" label="树种" width="90" />
         <el-table-column label="四阶段" min-width="300">
           <template #default="scope">
@@ -203,5 +216,11 @@ const events = computed<TimelineEvent[]>(() => {
 .missing {
   color: #c62828;
   font-size: 13px;
+}
+.alias-tag {
+  margin: 1px 3px 1px 0;
+}
+.alias-empty {
+  color: #c4b8ac;
 }
 </style>

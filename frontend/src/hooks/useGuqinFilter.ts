@@ -1,5 +1,7 @@
 import { computed, type ComputedRef } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useAliasStore } from '../stores/aliasStore';
+import { searchTokensOf } from '../utils/alias';
 import type { WoodBoard, WoodSpecies } from '../types/wood-board';
 
 export type StageKey = 'select' | 'carve' | 'lacquer' | 'string';
@@ -58,12 +60,16 @@ export function useGuqinFilter(): GuqinFilterApi {
   const activeCount = computed(() => [keyword.value, guqinNo.value, species.value, stage.value].filter(Boolean).length);
 
   const applyBoards = (boards: WoodBoard[]): WoodBoard[] => {
+    const aliasStore = useAliasStore();
+    const index = aliasStore.aliasIndex;
+    const canonical = (no: string) => index.get(no) ?? no;
     const kw = keyword.value.trim().toLowerCase();
     return boards.filter((board) => {
-      if (guqinNo.value && board.guqinNo !== guqinNo.value) return false;
+      // 琴号筛选：选正式号或输入旧号别名都能命中，统一归到正式号
+      if (guqinNo.value && canonical(board.guqinNo) !== canonical(guqinNo.value)) return false;
       if (species.value && board.species !== (species.value as WoodSpecies)) return false;
       if (kw) {
-        const haystack = `${board.boardNo} ${board.guqinNo} ${board.species} ${board.remark ?? ''}`.toLowerCase();
+        const haystack = `${board.boardNo} ${searchTokensOf(canonical(board.guqinNo), aliasStore.aliases)} ${board.species} ${board.remark ?? ''}`.toLowerCase();
         if (!haystack.includes(kw)) return false;
       }
       return true;

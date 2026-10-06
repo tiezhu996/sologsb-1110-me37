@@ -154,6 +154,7 @@ async function remove(board: WoodBoard) {
         { key: 'guqin', label: '琴号', options: boardStore.guqinNos, width: 130 },
         { key: 'species', label: '树种', options: WOOD_SPECIES, width: 110 },
       ]"
+      placeholder="搜索琴号 / 旧号别名 / 板材号 / 备注"
       :result-count="visible.length"
       :total-count="boardStore.boards.length"
     />

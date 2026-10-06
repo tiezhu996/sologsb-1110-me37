@@ -12,12 +12,18 @@ export function boardUsable(board: WoodBoard): boolean {
   return board.defect !== '裂纹' && board.dryYears >= 3;
 }
 
-/** 面板与底板按琴号配对 */
-export function pairBoards(boards: WoodBoard[]): BoardPair[] {
+/**
+ * 面板与底板按琴号配对。
+ * aliasIndex 存在时先把旧号（临时琴号）解析为正式琴号再配对，
+ * 使合档后板材进度只读正式琴号（旧号仅作可搜索别名）。
+ */
+export function pairBoards(boards: WoodBoard[], aliasIndex?: Map<string, string>): BoardPair[] {
+  const canonicalOf = (no: string) => (aliasIndex ? aliasIndex.get(no) ?? no : no);
   const map = new Map<string, BoardPair>();
   boards.forEach((board) => {
-    const pair = map.get(board.guqinNo) ?? {
-      guqinNo: board.guqinNo,
+    const guqinNo = canonicalOf(board.guqinNo);
+    const pair = map.get(guqinNo) ?? {
+      guqinNo,
       species: board.species,
       moisturePct: 0,
       matched: false,
@@ -27,7 +33,7 @@ export function pairBoards(boards: WoodBoard[]): BoardPair[] {
     } else {
       pair.base = board;
     }
-    map.set(board.guqinNo, pair);
+    map.set(guqinNo, pair);
   });
 
   return Array.from(map.values())

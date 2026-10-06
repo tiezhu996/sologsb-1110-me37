@@ -2,6 +2,8 @@ import { defineStore } from 'pinia';
 import { db } from '../utils/db';
 import { uid } from '../utils/id';
 import { toPlain } from '../utils/plain';
+import { useAliasStore } from './aliasStore';
+import { resolveGuqinNo, searchTokensOf } from '../utils/alias';
 import type { StringDefect, StringType, Stringing, ToneVersion } from '../types/stringing';
 
 export interface StringingInput {
@@ -31,15 +33,20 @@ export const useStringingStore = defineStore('stringing', {
 
   getters: {
     byGuqin(state) {
-      return (guqinNo: string): Stringing | undefined => state.stringings.find((s) => s.guqinNo === guqinNo);
+      const aliasStore = useAliasStore();
+      return (guqinNo: string): Stringing | undefined =>
+        state.stringings.find(
+          (s) => resolveGuqinNo(s.guqinNo, aliasStore.aliasIndex) === resolveGuqinNo(guqinNo, aliasStore.aliasIndex),
+        );
     },
-    /** 三段评语 + 九德的文字检索 */
+    /** 三段评语 + 九德的文字检索（旧号别名同样可搜到，结果归到正式琴号） */
     search(state) {
+      const aliasStore = useAliasStore();
       return (keyword: string): Stringing[] => {
         const kw = keyword.trim().toLowerCase();
         if (!kw) return state.stringings;
         return state.stringings.filter((s) =>
-          [s.guqinNo, s.sanNote, s.anNote, s.fanNote, s.nineVirtues, s.operator, s.defects.join(' ')]
+          [searchTokensOf(s.guqinNo, aliasStore.aliases), s.sanNote, s.anNote, s.fanNote, s.nineVirtues, s.operator, s.defects.join(' ')]
             .join(' ')
             .toLowerCase()
             .includes(kw),
@@ -52,6 +59,11 @@ export const useStringingStore = defineStore('stringing', {
   },
 
   actions: {
+    /** 把输入琴号（可能是旧号别名）规范为正式琴号；新数据一律挂正式号 */
+    canonicalNo(guqinNo: string): string {
+      return resolveGuqinNo(guqinNo.trim(), useAliasStore().aliasIndex);
+    },
+
     async hydrate() {
       this.stringings = await db.stringings.orderBy('strungAt').reverse().toArray();
       this.hydrated = true;
@@ -60,7 +72,7 @@ export const useStringingStore = defineStore('stringing', {
     async addStringing(input: StringingInput): Promise<Stringing> {
       const stringing: Stringing = {
         id: uid('stringing'),
-        guqinNo: input.guqinNo.trim(),
+        guqinNo: this.canonicalNo(input.guqinNo),
         stringType: input.stringType,
         nut: input.nut.trim(),
         stringGap: Number(input.stringGap) || 0,
@@ -103,7 +115,7 @@ export const useStringingStore = defineStore('stringing', {
 
       const next: Stringing = {
         ...current,
-        guqinNo: patch.guqinNo?.trim() ?? current.guqinNo,
+        guqinNo: patch.guqinNo !== undefined ? this.canonicalNo(patch.guqinNo) : current.guqinNo,
         stringType: patch.stringType ?? current.stringType,
         nut: patch.nut?.trim() ?? current.nut,
         stringGap: patch.stringGap !== undefined ? Number(patch.stringGap) : current.stringGap,

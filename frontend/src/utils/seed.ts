@@ -8,7 +8,8 @@ import { cumulativeThickness } from './layer';
 const DAY = 86_400_000;
 const daysAgo = (n: number) => new Date(Date.now() - n * DAY).toISOString();
 
-/** 示例琴坯：5 张琴、10 块板材 */
+/** 示例琴坯：6 张正式琴坯、12 块板材；其中 Q-2506 已配对板材，
+ * 但槽腹/髹漆/上弦仍挂在临时琴号 Q-LS-06 下（两边还有不一致字段），用于演示合档。 */
 export const SEED_BOARDS: WoodBoard[] = [
   { id: 'board-001', boardNo: 'MB-2501', guqinNo: 'Q-2501', part: '面板', species: '桐木', dryYears: 8, thicknessMm: 32, grain: '直纹', defect: '无', receivedAt: daysAgo(120), remark: '河南兰考桐' },
   { id: 'board-002', boardNo: 'MB-2502', guqinNo: 'Q-2501', part: '底板', species: '梓木', dryYears: 6, thicknessMm: 18, grain: '直纹', defect: '无', receivedAt: daysAgo(118) },
@@ -20,6 +21,9 @@ export const SEED_BOARDS: WoodBoard[] = [
   { id: 'board-008', boardNo: 'MB-2508', guqinNo: 'Q-2504', part: '底板', species: '梓木', dryYears: 9, thicknessMm: 19, grain: '直纹', defect: '无', receivedAt: daysAgo(78) },
   { id: 'board-009', boardNo: 'MB-2509', guqinNo: 'Q-2505', part: '面板', species: '桐木', dryYears: 2, thicknessMm: 29, grain: '直纹', defect: '裂纹', receivedAt: daysAgo(30), remark: '阴干不足且有裂纹，待退料' },
   { id: 'board-010', boardNo: 'MB-2510', guqinNo: 'Q-2505', part: '底板', species: '梓木', dryYears: 4, thicknessMm: 17, grain: '直纹', defect: '无', receivedAt: daysAgo(28) },
+  // Q-2506 面板底板已按正式号配对；槽腹/髹漆/上弦还挂在临时号 Q-LS-06
+  { id: 'board-011', boardNo: 'MB-2511', guqinNo: 'Q-2506', part: '面板', species: '桐木', dryYears: 7, thicknessMm: 32, grain: '直纹', defect: '无', receivedAt: daysAgo(50), remark: '配对后改正式号 Q-2506' },
+  { id: 'board-012', boardNo: 'MB-2512', guqinNo: 'Q-2506', part: '底板', species: '梓木', dryYears: 6, thicknessMm: 18, grain: '直纹', defect: '无', receivedAt: daysAgo(49) },
 ];
 
 export const SEED_CHAMBERS: SoundChamber[] = [
@@ -27,6 +31,9 @@ export const SEED_CHAMBERS: SoundChamber[] = [
   { id: 'chamber-002', guqinNo: 'Q-2502', nayinThickness: 14, longchiThickness: 12, fengzhaoThickness: 13, chamberDepth: 28, postPos: '天柱偏左', poolSize: '210×24', carvedAt: daysAgo(76), carver: '周砚秋' },
   { id: 'chamber-003', guqinNo: 'Q-2503', nayinThickness: 15, longchiThickness: 13, fengzhaoThickness: 14, chamberDepth: 25, postPos: '天柱偏右', poolSize: '195×21', carvedAt: daysAgo(60), carver: '林听雪' },
   { id: 'chamber-004', guqinNo: 'Q-2504', nayinThickness: 17, longchiThickness: 15, fengzhaoThickness: 16, chamberDepth: 24, postPos: '天柱中', poolSize: '215×25', carvedAt: daysAgo(44), carver: '林听雪', remark: '老料槽腹留厚' },
+  // 待合档：正式号 Q-2506 已按新测数据登记槽腹，临时号 Q-LS-06 还挂着初掏膛的旧尺寸
+  { id: 'chamber-005', guqinNo: 'Q-2506', nayinThickness: 15, longchiThickness: 13, fengzhaoThickness: 14, chamberDepth: 27, postPos: '天柱中', poolSize: '205×23', carvedAt: daysAgo(30), carver: '周砚秋', remark: '复掏后复测' },
+  { id: 'chamber-006', guqinNo: 'Q-LS-06', nayinThickness: 16, longchiThickness: 14, fengzhaoThickness: 15, chamberDepth: 25, postPos: '天柱中', poolSize: '200×22', carvedAt: daysAgo(40), carver: '周砚秋', remark: '初掏膛，临时号' },
 ];
 
 function buildSeedLayers(): LacquerLayer[] {
@@ -44,6 +51,13 @@ function buildSeedLayers(): LacquerLayer[] {
     ['Q-2504', '1:1.5', 28, 85, 600, 0.09, 21, '周砚秋'],
     ['Q-2501', '1:2', 18, 65, 800, 0.05, 18, '林听雪'],
     ['Q-2502', '纯生漆', 24, 70, 1000, 0.04, 12, '周砚秋'],
+    // 待合档：Q-2506 与临时号 Q-LS-06 各挂了髹漆记录——
+    // 第 1 遍两边重复（同内容自动去重），第 2 遍两边不一致（裁决整条选边），旧号第 3 遍单边迁入
+    ['Q-2506', '1:1', 24, 78, 240, 0.12, 26, '林听雪'],
+    ['Q-2506', '1:1.2', 26, 82, 400, 0.1, 14, '林听雪'],
+    ['Q-LS-06', '1:1', 24, 78, 240, 0.12, 26, '林听雪'],
+    ['Q-LS-06', '1:1', 25, 80, 320, 0.11, 14, '林听雪'],
+    ['Q-LS-06', '纯生漆', 23, 72, 800, 0.04, 6, '周砚秋'],
   ];
 
   const seqMap = new Map<string, number>();
@@ -126,6 +140,39 @@ export const SEED_STRINGINGS: Stringing[] = [
     operator: '林听雪',
     noteVersions: [
       { id: 'tv-001', savedAt: daysAgo(3), sanNote: '散音初上，音色紧。', anNote: '按音略抗指。', fanNote: '泛音偏闷。', nineVirtues: '新弦未开。' },
+    ],
+  },
+  // 待合档：正式号 Q-2506 已按正式号试音一次，临时号 Q-LS-06 上还有一版更早的初上弦评语与版本
+  {
+    id: 'stringing-004',
+    guqinNo: 'Q-2506',
+    stringType: '丝弦',
+    nut: '红木雁足 + 丝绒扣',
+    stringGap: 17,
+    sanNote: '散音宽厚，一弦沉稳。',
+    anNote: '按音顺滑，九徽以下沉静。',
+    fanNote: '泛音清亮，五徽尤净。',
+    nineVirtues: '奇、润见长，透、匀尚需养。',
+    defects: ['无'],
+    strungAt: daysAgo(4),
+    operator: '周砚秋',
+    noteVersions: [],
+  },
+  {
+    id: 'stringing-005',
+    guqinNo: 'Q-LS-06',
+    stringType: '丝弦',
+    nut: '红木雁足 + 丝绒扣',
+    stringGap: 17,
+    sanNote: '散音初上偏紧，七弦略躁。',
+    anNote: '按音微抗指，走弦待开。',
+    fanNote: '泛音清亮，五徽尤净。',
+    nineVirtues: '新弦初上，九德未全。',
+    defects: ['抗指'],
+    strungAt: daysAgo(9),
+    operator: '林听雪',
+    noteVersions: [
+      { id: 'tv-ls06-1', savedAt: daysAgo(9), sanNote: '散音生涩。', anNote: '按音抗指明显。', fanNote: '泛音偏紧。', nineVirtues: '初上弦，待养。' },
     ],
   },
 ];

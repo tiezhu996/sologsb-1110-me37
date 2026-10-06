@@ -3,6 +3,8 @@ import { db } from '../utils/db';
 import { uid } from '../utils/id';
 import { toPlain } from '../utils/plain';
 import { cumulativeThickness, nextSeq, sortLayers } from '../utils/layer';
+import { useAliasStore } from './aliasStore';
+import { resolveGuqinNo } from '../utils/alias';
 import type { LacquerLayer } from '../types/lacquer-layer';
 
 export interface LacquerInput {
@@ -28,14 +30,27 @@ export const useLacquerStore = defineStore('lacquer', {
 
   getters: {
     layersOf(state) {
-      return (guqinNo: string): LacquerLayer[] => sortLayers(state.layers.filter((l) => l.guqinNo === guqinNo));
+      const aliasStore = useAliasStore();
+      return (guqinNo: string): LacquerLayer[] => {
+        const canonical = resolveGuqinNo(guqinNo, aliasStore.aliasIndex);
+        return sortLayers(
+          state.layers.filter((l) => resolveGuqinNo(l.guqinNo, aliasStore.aliasIndex) === canonical),
+        );
+      };
     },
     /** 该琴当前累计厚度（mm） */
     totalOf(state) {
-      return (guqinNo: string): number => cumulativeThickness(state.layers.filter((l) => l.guqinNo === guqinNo));
+      const aliasStore = useAliasStore();
+      return (guqinNo: string): number => {
+        const canonical = resolveGuqinNo(guqinNo, aliasStore.aliasIndex);
+        return cumulativeThickness(
+          state.layers.filter((l) => resolveGuqinNo(l.guqinNo, aliasStore.aliasIndex) === canonical),
+        );
+      };
     },
     guqinNos(state): string[] {
-      return Array.from(new Set(state.layers.map((l) => l.guqinNo))).sort();
+      const aliasStore = useAliasStore();
+      return Array.from(new Set(state.layers.map((l) => resolveGuqinNo(l.guqinNo, aliasStore.aliasIndex)))).sort();
     },
     /** 荫房温湿度超窗口的遍次数量 */
     outOfRangeCount(state): number {
@@ -44,6 +59,11 @@ export const useLacquerStore = defineStore('lacquer', {
   },
 
   actions: {
+    /** 把输入的琴号（可能是旧号别名）规范为正式琴号；新写入数据一律挂正式号 */
+    canonicalNo(guqinNo: string): string {
+      return resolveGuqinNo(guqinNo.trim(), useAliasStore().aliasIndex);
+    },
+
     async hydrate() {
       this.layers = await db.lacquers.toArray();
       this.hydrated = true;
@@ -51,10 +71,11 @@ export const useLacquerStore = defineStore('lacquer', {
 
     /** 追加一遍：遍次自动 +1，并重算该琴累计厚度 */
     async appendLayer(input: LacquerInput): Promise<LacquerLayer> {
-      const siblings = this.layers.filter((l) => l.guqinNo === input.guqinNo);
+      const guqinNo = this.canonicalNo(input.guqinNo);
+      const siblings = this.layers.filter((l) => l.guqinNo === guqinNo);
       const layer: LacquerLayer = {
         id: uid('layer'),
-        guqinNo: input.guqinNo.trim(),
+        guqinNo,
         seq: nextSeq(siblings),
         mixRatio: input.mixRatio,
         curingTemp: Number(input.curingTemp) || 0,
@@ -82,7 +103,8 @@ export const useLacquerStore = defineStore('lacquer', {
     async updateLayer(id: string, patch: Partial<LacquerInput>) {
       const current = this.layers.find((l) => l.id === id);
       if (!current) return;
-      const next: LacquerLayer = { ...current, ...patch };
+      const normalizedPatch = patch.guqinNo !== undefined ? { ...patch, guqinNo: this.canonicalNo(patch.guqinNo) } : patch;
+      const next: LacquerLayer = { ...current, ...normalizedPatch };
       const siblings = this.layers.filter((l) => l.guqinNo === next.guqinNo).map((l) => (l.id === id ? next : l));
       const withTotals = siblings.map((item) => ({ ...item, totalThickness: cumulativeThickness(siblings, item.seq) }));
       for (const item of withTotals) {

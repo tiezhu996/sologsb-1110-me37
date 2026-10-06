@@ -7,6 +7,7 @@ import EmptyPanel from '../components/common/EmptyPanel.vue';
 import ToneTextEditor from '../components/common/ToneTextEditor.vue';
 import { useStringingStore } from '../stores/stringingStore';
 import { useBoardStore } from '../stores/boardStore';
+import { useAliasStore } from '../stores/aliasStore';
 import { formatDate } from '../utils/layer';
 import {
   NINE_VIRTUES,
@@ -21,6 +22,7 @@ import {
 const route = useRoute();
 const stringingStore = useStringingStore();
 const boardStore = useBoardStore();
+const aliasStore = useAliasStore();
 
 const dialogVisible = ref(false);
 const editingId = ref('');
@@ -160,7 +162,7 @@ async function remove(stringing: Stringing) {
         { key: 'stringType', label: '弦材质', options: STRING_TYPES, width: 110 },
         { key: 'defect', label: '缺陷', options: STRING_DEFECTS, width: 110 },
       ]"
-      keyword-placeholder="检索散音 / 按音 / 泛音 / 九德文字"
+      keyword-placeholder="检索琴号 / 旧号别名 / 散音 / 按音 / 泛音 / 九德文字"
       :result-count="visible.length"
       :total-count="stringingStore.stringings.length"
     />
@@ -169,7 +171,15 @@ async function remove(stringing: Stringing) {
 
     <el-card v-else shadow="never" class="block">
       <el-table :data="visible" size="small" border>
-        <el-table-column prop="guqinNo" label="琴号" width="100" />
+        <el-table-column prop="guqinNo" label="正式琴号" width="100" />
+        <el-table-column label="旧号别名" width="120">
+          <template #default="scope">
+            <el-tag v-for="alias in aliasStore.aliasesOf(scope.row.guqinNo)" :key="alias" size="small" type="info" effect="plain" class="alias-tag">
+              {{ alias }}
+            </el-tag>
+            <span v-if="!aliasStore.aliasesOf(scope.row.guqinNo).length" class="alias-empty">—</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="stringType" label="弦材质" width="90" />
         <el-table-column prop="nut" label="雁足与绒扣" width="170" />
         <el-table-column prop="stringGap" label="弦距(mm)" width="90" />
@@ -270,5 +280,11 @@ async function remove(stringing: Stringing) {
 }
 .defect-tag {
   margin-right: 4px;
+}
+.alias-tag {
+  margin: 1px 3px 1px 0;
+}
+.alias-empty {
+  color: #c4b8ac;
 }
 </style>
